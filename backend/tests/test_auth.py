@@ -15,6 +15,7 @@ def test_bootstrap_is_closed_after_first_account(client, owner):
     r = client.get("/api/v1/auth/bootstrap")
     assert r.status_code == 200
     assert r.json()["bootstrap_required"] is False
+    assert r.json()["self_registration"] is True
 
 
 def test_login_sets_valid_future_expiry(client, owner):
@@ -101,6 +102,36 @@ def test_self_registration_rejects_weak_password(client, owner):
     )
     assert r.status_code == 422
     assert r.json()["detail"]["code"] == "weak_password"
+
+
+def test_self_registration_accepts_self_hosted_domain(client, owner):
+    email = "member@nexus.local"
+    r = client.post(
+        "/api/v1/auth/register",
+        json={"email": email, "full_name": "Internal Member", "password": "Internal!Nexus2026"},
+    )
+    assert r.status_code == 201, r.text
+    assert r.json()["user"]["email"] == email
+    assert r.json()["user"]["role"] == "viewer"
+
+
+def test_self_registration_rejects_malformed_email(client, owner):
+    r = client.post(
+        "/api/v1/auth/register",
+        json={"email": "not-an-email", "full_name": "Nope", "password": "Internal!Nexus2026"},
+    )
+    assert r.status_code == 422
+    assert r.json()["detail"]["code"] == "invalid_email"
+
+
+def test_self_registration_can_be_disabled(client, owner, monkeypatch):
+    monkeypatch.setattr(settings, "self_registration_enabled", False)
+    r = client.post(
+        "/api/v1/auth/register",
+        json={"email": "blocked@example.com", "full_name": "Blocked", "password": "Internal!Nexus2026"},
+    )
+    assert r.status_code == 403
+    assert r.json()["detail"]["code"] == "registration_disabled"
 
 
 def test_refresh_rotates_to_working_access_token(client):

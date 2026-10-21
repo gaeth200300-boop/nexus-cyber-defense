@@ -88,6 +88,15 @@ def clean_job_queue(client):
     yield
 
 
+@pytest.fixture(autouse=True)
+def reset_rate_limiter():
+    """Registration tests share one client IP; clear the sliding window per test."""
+    from app.core.ratelimit import limiter
+
+    limiter.reset()
+    yield
+
+
 def run_next_job() -> str:
     """Claim exactly one queued job and execute it in this process."""
     import asyncio

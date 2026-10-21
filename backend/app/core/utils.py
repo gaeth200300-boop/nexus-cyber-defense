@@ -109,6 +109,31 @@ def mask_secret(value: str | None, keep: int = 4) -> str:
     return value[:keep] + "*" * (len(value) - keep * 2) + value[-keep:]
 
 
+# A pragmatic, syntax-only email shape. Self-hosted deployments legitimately
+# use internal domains such as "admin@nexus.local" that DNS-aware validators
+# reject, and this platform never relies on deliverability - only on a sane
+# local@domain form for account keys.
+_EMAIL_RE = re.compile(
+    r"^[A-Za-z0-9!#$%&'*+/=?^_`{|}~.-]{1,64}"
+    r"@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?"
+    r"(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+$"
+)
+
+
+def is_valid_email(value: str) -> bool:
+    """True when *value* looks like a usable ``local@domain`` address."""
+    if not isinstance(value, str):
+        return False
+    if len(value) > 255 or value.count("@") != 1 or any(ch.isspace() for ch in value):
+        return False
+    local, _, domain = value.partition("@")
+    if not local or len(local) > 64 or not domain or len(domain) > 253:
+        return False
+    if domain.startswith(".") or domain.endswith(".") or ".." in domain:
+        return False
+    return bool(_EMAIL_RE.match(value))
+
+
 # ---------------------------------------------------------------------------
 # Networking helpers
 # ---------------------------------------------------------------------------

@@ -6,7 +6,7 @@ import logging
 from typing import Any
 
 from fastapi import APIRouter, Depends, Request, status
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from ...config import settings
 from ...core.audit import record as audit_record
 from ...core.ratelimit import limiter
-from ...core.utils import humanize_age, to_iso_z, utcnow
+from ...core.utils import humanize_age, is_valid_email, to_iso_z, utcnow
 from ...db import get_db
 from ...models import ProjectMember, User
 from ...security import (
@@ -56,7 +56,9 @@ class RefreshBody(BaseModel):
 
 
 class BootstrapBody(BaseModel):
-    email: EmailStr
+    # Plain str: self-hosted installs bootstrap with special-use domains such
+    # as admin@nexus.local, which stricter email validators reject.
+    email: str = Field(min_length=3, max_length=255)
     full_name: str = Field(default="", max_length=160)
     password: str = Field(min_length=12, max_length=200)
 
@@ -64,7 +66,7 @@ class BootstrapBody(BaseModel):
 class RegisterBody(BaseModel):
     """Self-service registration. The role is fixed server-side to viewer."""
 
-    email: EmailStr
+    email: str = Field(min_length=3, max_length=255)
     full_name: str = Field(default="", max_length=160)
     password: str = Field(min_length=12, max_length=200)
 
@@ -160,6 +162,13 @@ def register(body: RegisterBody, request: Request, db: Session = Depends(get_db)
     the bootstrap flow, so a public endpoint can never mint an owner. New
     accounts receive no project memberships until an administrator grants them.
     """
+    if not settings.self_registration_enabled:
+        raise api_error(
+            "registration_disabled",
+            "Self-service registration is disabled on this platform.",
+            status.HTTP_403_FORBIDDEN,
+        )
+
     ip = client_ip(request)
     allowed, _, retry_after = limiter.check(f"register:{ip}", 5)
     if not allowed:
@@ -178,9 +187,9 @@ def register(body: RegisterBody, request: Request, db: Session = Depends(get_db)
             status.HTTP_409_CONFLICT,
         )
 
-    email = str(body.email).lower().strip()
-    if len(email) > 255:
-        raise api_error("invalid_email", "The email address is too long.", status.HTTP_422_UNPROCESSABLE_ENTITY)
+    email = body.email.strip().lower()
+    if not is_valid_email(email):
+        raise api_error("invalid_email", "Enter a valid email address.", status.HTTP_422_UNPROCESSABLE_ENTITY)
     if db.execute(select(User).where(User.email == email)).scalar_one_or_none():
         raise api_error("email_taken", "An account with this email already exists.", status.HTTP_409_CONFLICT)
 
@@ -328,7 +337,12 @@ def mfa_disable(body: MfaDisableBody, auth: AuthContext = Depends(get_auth), db:
 @router.get("/bootstrap")
 def bootstrap_status(db: Session = Depends(get_db)) -> dict[str, Any]:
     count = int(db.execute(select(func.count(User.id))).scalar_one() or 0)
-    return {"bootstrap_required": count == 0, "accounts": count, "admin_email": settings.bootstrap_admin_email if count == 0 else ""}
+    return {
+        "bootstrap_required": count == 0,
+        "accounts": count,
+        "admin_email": settings.bootstrap_admin_email if count == 0 else "",
+        "self_registration": bool(settings.self_registration_enabled),
+    }
 
 
 @router.post("/bootstrap", status_code=status.HTTP_201_CREATED)
@@ -339,8 +353,11 @@ def bootstrap(body: BootstrapBody, db: Session = Depends(get_db)) -> dict[str, A
     score, suggestions = password_strength(body.password)
     if score < 2:
         raise api_error("weak_password", "Choose a stronger password for the owner account.", status.HTTP_422_UNPROCESSABLE_ENTITY, suggestions=suggestions)
+    email = body.email.strip().lower()
+    if not is_valid_email(email):
+        raise api_error("invalid_email", "Enter a valid email address.", status.HTTP_422_UNPROCESSABLE_ENTITY)
     user = User(
-        email=body.email.lower().strip(),
+        email=email,
         full_name=body.full_name.strip() or "Owner",
         role="owner",
         password_hash=hash_password(body.password),

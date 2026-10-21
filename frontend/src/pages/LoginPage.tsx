@@ -14,6 +14,7 @@ import {
   Radar,
   ShieldCheck,
   Sun,
+  UserPlus,
   Users
 } from "lucide-react";
 import { ApiError } from "../lib/api";
@@ -25,11 +26,11 @@ import { Logo } from "../components/Logo";
 import { Button, Field, InlineAlert, Input } from "../components/ui";
 import { useDocumentTitle } from "../hooks";
 
-type Mode = "login" | "bootstrap";
+type Mode = "login" | "bootstrap" | "register";
 
 export default function LoginPage() {
   const { t, i18n } = useTranslation();
-  const { user, login, bootstrap, loading, bootstrapRequired, bootstrapEmail } = useAuth();
+  const { user, login, register, bootstrap, loading, bootstrapRequired, bootstrapEmail, selfRegistration } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
@@ -113,6 +114,37 @@ export default function LoginPage() {
     } catch (caught) {
       if (caught instanceof ApiError) {
         setError(caught.message);
+        const detailSuggestions = caught.detail?.suggestions;
+        if (Array.isArray(detailSuggestions)) setSuggestions(detailSuggestions.map(String));
+      } else {
+        setError(caught instanceof Error ? caught.message : t("toasts.connection"));
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const submitRegister = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setError("");
+    setFieldErrors({});
+    const errors: Record<string, string> = {};
+    if (fullName.trim().length < 2) errors.fullName = t("common.required");
+    if (!email.includes("@")) errors.email = t("auth.emailPlaceholder");
+    if (password.length < 12) errors.password = t("auth.strongPassword");
+    if (password !== confirmPassword) errors.confirmPassword = t("profile.passwordMismatch");
+    if (Object.keys(errors).length) {
+      setFieldErrors(errors);
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await register(email, fullName, password);
+      localStorage.setItem("nexus.last_email", email.trim().toLowerCase());
+      navigate("/dashboard", { replace: true });
+    } catch (caught) {
+      if (caught instanceof ApiError) {
+        setError(caught.message || t("toasts.failed"));
         const detailSuggestions = caught.detail?.suggestions;
         if (Array.isArray(detailSuggestions)) setSuggestions(detailSuggestions.map(String));
       } else {
@@ -244,10 +276,18 @@ export default function LoginPage() {
                 <Fingerprint className="h-5 w-5" />
               </div>
               <h2 className="font-display text-xl font-semibold tracking-tight text-ink">
-                {mode === "bootstrap" ? t("auth.bootstrapTitle") : t("auth.welcomeBack")}
+                {mode === "bootstrap"
+                  ? t("auth.bootstrapTitle")
+                  : mode === "register"
+                    ? t("auth.registerTitle")
+                    : t("auth.welcomeBack")}
               </h2>
               <p className="mt-1.5 text-xs leading-relaxed text-muted">
-                {mode === "bootstrap" ? t("auth.bootstrapSubtitle") : t("auth.loginSubtitle")}
+                {mode === "bootstrap"
+                  ? t("auth.bootstrapSubtitle")
+                  : mode === "register"
+                    ? t("auth.registerSubtitle")
+                    : t("auth.loginSubtitle")}
               </p>
             </div>
 
@@ -313,6 +353,69 @@ export default function LoginPage() {
                   {!submitting ? <ArrowRight className="h-4 w-4 rtl:flip-x" /> : null}
                 </Button>
                 <p className="text-center text-[10px] leading-relaxed text-faint">{t("auth.bootstrapNote")}</p>
+              </form>
+            ) : mode === "register" ? (
+              <form onSubmit={submitRegister} className="space-y-4">
+                <InlineAlert title={t("auth.registerTitle")} tone="info" icon={UserPlus}>
+                  {t("auth.registerInfo")}
+                </InlineAlert>
+                <Field label={t("auth.registerName")} required>
+                  <Input
+                    value={fullName}
+                    onChange={(event) => setFullName(event.target.value)}
+                    placeholder={t("auth.registerName")}
+                    autoComplete="name"
+                    autoFocus
+                  />
+                  {fieldErrors.fullName ? <span className="text-[10px] text-danger">{fieldErrors.fullName}</span> : null}
+                </Field>
+                <Field label={t("auth.email")} required>
+                  <Input
+                    type="email"
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                    placeholder={t("auth.emailPlaceholder")}
+                    autoComplete="email"
+                  />
+                  {fieldErrors.email ? <span className="text-[10px] text-danger">{fieldErrors.email}</span> : null}
+                </Field>
+                <Field label={t("common.password")} required hint={t("auth.strongPassword")}>
+                  <div className="relative">
+                    <Input
+                      type={showPassword ? "text" : "password"}
+                      value={password}
+                      onChange={(event) => setPassword(event.target.value)}
+                      className="pe-10"
+                      autoComplete="new-password"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((current) => !current)}
+                      className="absolute end-2 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-lg text-faint hover:text-ink"
+                      aria-label={showPassword ? t("auth.hidePassword") : t("auth.showPassword")}
+                    >
+                      {showPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                    </button>
+                  </div>
+                  {fieldErrors.password ? <span className="text-[10px] text-danger">{fieldErrors.password}</span> : null}
+                </Field>
+                <Field label={t("profile.confirmPassword")} required>
+                  <Input
+                    type={showPassword ? "text" : "password"}
+                    value={confirmPassword}
+                    onChange={(event) => setConfirmPassword(event.target.value)}
+                    autoComplete="new-password"
+                  />
+                  {fieldErrors.confirmPassword ? (
+                    <span className="text-[10px] text-danger">{fieldErrors.confirmPassword}</span>
+                  ) : null}
+                </Field>
+                {error ? <InlineAlert tone="danger">{error}</InlineAlert> : null}
+                <Button type="submit" size="lg" className="w-full" loading={submitting}>
+                  {submitting ? t("auth.registering") : t("auth.registerBtn")}
+                  {!submitting ? <ArrowRight className="h-4 w-4 rtl:flip-x" /> : null}
+                </Button>
+                <p className="text-center text-[10px] leading-relaxed text-faint">{t("auth.registerNote")}</p>
               </form>
             ) : (
               <form onSubmit={submitLogin} className="space-y-4">
@@ -415,6 +518,35 @@ export default function LoginPage() {
 
           {mode === "login" && !bootstrapRequired ? (
             <p className="mt-6 text-center text-[10px] leading-relaxed text-faint">{t("auth.demoHint")}</p>
+          ) : null}
+          {mode === "login" && !bootstrapRequired && selfRegistration ? (
+            <button
+              type="button"
+              onClick={() => {
+                setMode("register");
+                setError("");
+                setSuggestions([]);
+                setMfaRequired(false);
+              }}
+              className="mx-auto mt-4 flex items-center justify-center gap-2 rounded-xl border border-accent/25 bg-accent/[0.06] px-5 py-2.5 text-[11px] font-semibold text-accent2 transition hover:border-accent/45 hover:bg-accent/10 focus-ring"
+            >
+              <UserPlus className="h-3.5 w-3.5" />
+              {t("auth.createAccount")}
+            </button>
+          ) : null}
+          {mode === "register" ? (
+            <button
+              type="button"
+              onClick={() => {
+                setMode("login");
+                setError("");
+                setSuggestions([]);
+                setMfaRequired(false);
+              }}
+              className="mt-5 block w-full text-center text-[10px] text-faint underline-offset-4 hover:text-muted hover:underline"
+            >
+              {t("auth.haveAccount")} {t("auth.signIn")}
+            </button>
           ) : null}
           {mode === "bootstrap" ? (
             <button

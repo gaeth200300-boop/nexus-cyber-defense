@@ -26,8 +26,10 @@ interface AuthContextValue {
   loading: boolean;
   bootstrapRequired: boolean;
   bootstrapEmail: string;
+  selfRegistration: boolean;
   authMethod: string;
   login: (email: string, password: string, totpCode?: string) => Promise<void>;
+  register: (email: string, fullName: string, password: string) => Promise<void>;
   bootstrap: (email: string, fullName: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshMe: () => Promise<User | null>;
@@ -47,6 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [bootstrapRequired, setBootstrapRequired] = useState(false);
   const [bootstrapEmail, setBootstrapEmail] = useState("");
+  const [selfRegistration, setSelfRegistration] = useState(true);
   const [authMethod, setAuthMethod] = useState("password");
   const mounted = useRef(true);
 
@@ -79,10 +82,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         bootstrap_required: boolean;
         accounts: number;
         admin_email: string;
+        self_registration?: boolean;
       }>("/auth/bootstrap", { auth: false });
       if (!mounted.current) return;
       setBootstrapRequired(response.bootstrap_required);
       setBootstrapEmail(response.admin_email || "");
+      setSelfRegistration(response.self_registration ?? true);
     } catch {
       if (mounted.current) setBootstrapRequired(false);
     }
@@ -147,6 +152,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     notifyAuthChanged();
   }, []);
 
+  const register = useCallback(
+    async (email: string, fullName: string, password: string) => {
+      await apiFetch<{ ok: boolean; user: User; message: string }>("/auth/register", {
+        method: "POST",
+        auth: false,
+        body: { email: email.trim(), full_name: fullName.trim(), password }
+      });
+      // Self-registration returns no tokens; sign the new viewer in right away.
+      await login(email, password);
+    },
+    [login]
+  );
+
   const logout = useCallback(async () => {
     try {
       if (getAccessToken()) await apiFetch<void>("/auth/logout", { method: "POST" });
@@ -177,14 +195,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loading,
       bootstrapRequired,
       bootstrapEmail,
+      selfRegistration,
       authMethod,
       login,
+      register,
       bootstrap,
       logout,
       refreshMe,
       setUser
     }),
-    [user, loading, bootstrapRequired, bootstrapEmail, authMethod, login, bootstrap, logout, refreshMe, setUser]
+    [user, loading, bootstrapRequired, bootstrapEmail, selfRegistration, authMethod, login, register, bootstrap, logout, refreshMe, setUser]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

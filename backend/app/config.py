@@ -46,6 +46,7 @@ class Settings(BaseSettings):
     # --- security policy ---
     allow_private_targets: bool = Field(default=False)
     active_scanning_enabled: bool = Field(default=True)
+    self_registration_enabled: bool = Field(default=True)
     rate_limit_per_minute: int = Field(default=240, ge=10, le=100000)
     max_upload_mb: int = Field(default=25, ge=1, le=512)
 

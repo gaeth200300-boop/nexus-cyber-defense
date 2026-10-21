@@ -5,13 +5,13 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter, Depends, Query, status
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from ...config import settings
 from ...core.constants import GLOBAL_ROLES
-from ...core.utils import to_iso_z
+from ...core.utils import is_valid_email, to_iso_z
 from ...db import get_db
 from ...models import ProjectMember, User
 from ...security import hash_password, password_strength
@@ -21,7 +21,9 @@ router = APIRouter(prefix="/users", tags=["users"])
 
 
 class UserCreate(BaseModel):
-    email: EmailStr
+    # Plain str so admin-created accounts may use self-hosted domains such as
+    # analyst@nexus.local; syntax is validated with is_valid_email() below.
+    email: str = Field(min_length=3, max_length=255)
     full_name: str = Field(default="", max_length=160)
     role: str = Field(default="analyst")
     password: str = Field(min_length=12, max_length=200)
@@ -96,7 +98,9 @@ def create_user(
         raise api_error("invalid_role", f"Role must be one of {list(GLOBAL_ROLES)}.")
     if body.role == "owner" and auth.user.role != "owner":
         raise api_error("insufficient_role", "Only an owner can create another owner.", status.HTTP_403_FORBIDDEN)
-    email = body.email.lower().strip()
+    email = body.email.strip().lower()
+    if not is_valid_email(email):
+        raise api_error("invalid_email", "Enter a valid email address.", status.HTTP_422_UNPROCESSABLE_ENTITY)
     if db.execute(select(User).where(User.email == email)).scalar_one_or_none():
         raise api_error("email_taken", "An account with this email already exists.", status.HTTP_409_CONFLICT)
     score, suggestions = password_strength(body.password)
