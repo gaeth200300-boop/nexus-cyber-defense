@@ -1,0 +1,1 @@
+﻿"""Purple-team simulation catalogue."""

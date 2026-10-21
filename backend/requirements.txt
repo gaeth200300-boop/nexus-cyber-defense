@@ -1,0 +1,33 @@
+# =============================================================================
+# NEXUS CYBER DEFENSE — backend runtime dependencies
+# Python 3.11+ (verified on 3.13) — Windows 10 friendly, no compiler needed.
+# =============================================================================
+
+# --- Web framework / validation ---
+fastapi>=0.115,<1.0
+uvicorn[standard]>=0.30
+pydantic>=2.7,<3
+pydantic-settings>=2.3
+email-validator>=2.1
+python-multipart>=0.0.9
+
+# --- Database ---
+SQLAlchemy>=2.0.30,<3.0
+alembic>=1.13
+
+# --- Auth / crypto ---
+PyJWT>=2.8
+argon2-cffi>=23.1
+pyotp>=2.9
+
+# --- Engines (real scanning, pure Python) ---
+dnspython>=2.6
+httpx>=0.27,<1.0
+cryptography>=42
+dpkt>=1.9.8
+defusedxml>=0.7.1
+
+# --- Reporting ---
+reportlab>=4.1
+arabic-reshaper>=3.0
+python-bidi>=0.4.2

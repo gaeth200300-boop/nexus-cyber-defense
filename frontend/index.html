@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="ar" dir="rtl" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#07080d" />
+    <meta name="description" content="NEXUS Cyber Defense — enterprise security assessment, threat intelligence and SOC platform." />
+    <meta name="color-scheme" content="dark light" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>NEXUS · Cyber Defense</title>
+  </head>
+  <body>
+    <div id="root">
+      <div class="boot-splash">
+        <div class="boot-mark">NEXUS<span>V1</span></div>
+        <p class="boot-title">NEXUS CYBER DEFENSE</p>
+        <p class="boot-text">جارٍ تهيئة المنصة… / Starting the platform…</p>
+        <p class="boot-help">
+          إذا فُتح هذا الملف مباشرة فلن تعمل الواجهة.<br />
+          شغّل المنصة من مجلد المشروع عبر <code>scripts\nexus.cmd start</code><br />
+          ثم افتح <a href="http://127.0.0.1:5173">http://127.0.0.1:5173</a> أو
+          <a href="http://127.0.0.1:8000">http://127.0.0.1:8000</a>.<br />
+          <span>Opening index.html directly does not start the React application.</span>
+        </p>
+      </div>
+    </div>
+    <noscript>NEXUS requires JavaScript to run.</noscript>
+    <style>
+      .boot-splash {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        padding: 32px;
+        background:
+          radial-gradient(900px 500px at 70% -10%, rgba(124, 58, 237, 0.22), transparent 60%),
+          radial-gradient(700px 400px at 10% 110%, rgba(34, 211, 238, 0.13), transparent 60%),
+          #07080d;
+        color: #e9edf8;
+        font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+        text-align: center;
+      }
+      .boot-mark {
+        letter-spacing: 0.35em;
+        font-size: 34px;
+        font-weight: 800;
+        color: #fff;
+        text-shadow: 0 0 40px rgba(124, 58, 237, 0.65);
+      }
+      .boot-mark span {
+        margin-inline-start: 8px;
+        font-size: 11px;
+        vertical-align: middle;
+        color: #22d3ee;
+      }
+      .boot-title {
+        margin: 0;
+        font-size: 12px;
+        letter-spacing: 0.28em;
+        color: #a78bfa;
+      }
+      .boot-text {
+        margin: 8px 0 0;
+        font-size: 14px;
+        color: #cbd5e1;
+      }
+      .boot-help {
+        margin: 18px 0 0;
+        max-width: 620px;
+        font-size: 13px;
+        line-height: 2;
+        color: #94a3b8;
+      }
+      .boot-help code {
+        padding: 2px 8px;
+        border: 1px solid rgba(148, 163, 184, 0.28);
+        border-radius: 6px;
+        background: rgba(15, 23, 42, 0.7);
+        color: #67e8f9;
+        direction: ltr;
+        display: inline-block;
+      }
+      .boot-help a {
+        color: #a78bfa;
+        text-decoration: none;
+      }
+      .boot-help span {
+        display: inline-block;
+        margin-top: 8px;
+        font-size: 11px;
+        color: #64748b;
+      }
+    </style>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

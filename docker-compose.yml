@@ -1,0 +1,96 @@
+# NEXUS CYBER DEFENSE — production-like local deployment.
+#
+# Usage:
+#   copy .env.production.example .env.production
+#   edit .env.production  (replace every REPLACE_WITH_* value)
+#   docker compose up -d --build
+#   open http://localhost:8080
+#
+# The API and worker share the PostgreSQL database and the same storage volume.
+# The web container serves the built SPA and proxies /api to the API container.
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    env_file:
+      - .env.production
+    volumes:
+      - nexus-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-nexus} -d $${POSTGRES_DB:-nexus}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    security_opt:
+      - no-new-privileges:true
+
+  api:
+    build: ./backend
+    restart: unless-stopped
+    command: ["api"]
+    env_file:
+      - .env.production
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+      NEXUS_INPROCESS_WORKER: "false"
+    volumes:
+      - nexus-storage:/app/storage
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/system/health', timeout=3)"
+      interval: 10s
+      timeout: 5s
+      retries: 24
+      start_period: 30s
+    ports:
+      - "8000:8000"
+    security_opt:
+      - no-new-privileges:true
+
+  worker:
+    build: ./backend
+    restart: unless-stopped
+    command: ["worker"]
+    env_file:
+      - .env.production
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+      NEXUS_INPROCESS_WORKER: "false"
+    volumes:
+      - nexus-storage:/app/storage
+    depends_on:
+      db:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+
+  web:
+    build: ./frontend
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "8080:80"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  nexus-db:
+  nexus-storage:
