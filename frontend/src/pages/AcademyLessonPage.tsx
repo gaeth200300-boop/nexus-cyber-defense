@@ -611,7 +611,13 @@ export default function AcademyLessonPage() {
               <KeyValue label={t("academy.duration")} value={t("academy.studyMinutes", { count: lesson.duration_minutes })} />
               <KeyValue
                 label={t("academy.quizAttempts", { count: lesson.quiz_attempts })}
-                value={lesson.quiz_score !== null ? `${lesson.quiz_score}%` : t("academy.noQuiz")}
+                value={
+                  lesson.quiz_score !== null
+                    ? `${lesson.quiz_score}%`
+                    : quiz.length
+                      ? t("academy.noAttempts")
+                      : t("academy.noQuiz")
+                }
               />
               {lesson.completed_at ? (
                 <KeyValue label={t("academy.completedOn")} value={formatDateTime(lesson.completed_at)} />
